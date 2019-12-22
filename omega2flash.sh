@@ -11,7 +11,7 @@ if [[ $# -lt 2 || $# -gt 4 ]]; then
 fi
 
 # config
-PROG_LOG="/tmp/flashed_ipv6"
+PROG_LOG="/tmp/flashed_omega2_ipv6"
 
 # gather args
 ETH_IF=$1
@@ -29,7 +29,7 @@ if [[ -n "${UBOOT_ENV_FILE}" && ! -f "${UBOOT_ENV_FILE}" ]]; then
   exit 1
 fi
 # check for "expect" utility
-if ! command -v expect; then
+if ! command -v expect >/dev/null; then
   echo "missing 'expect' command line tool - must be installed for this script to work"
   exit 1
 fi
@@ -144,8 +144,7 @@ grep "${OMEGA2_IPV6}" "${PROG_LOG}"
 if [[ $? == 0 ]]; then
   # already programmed
   echo "[$(date)] Omega2 at ${OMEGA2_IPV6} has been programmed before -> do not try it again"
-  cat /var/dhcp.leases
-  sleep 10
+  sleep 2
   exit 1
 fi
 
