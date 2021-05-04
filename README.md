@@ -27,8 +27,8 @@ Where:
 - **list** will list the link local IPv6 addresses of all Omega2 devices found on the network segment as specified with *ethernet-if*.
 - **ping** will list the link local IPv6 addresses of all devices found on the network segment as specified with *ethernet-if*.
 - **\<firmware.bin\>** must be a OpenWrt firmware image for Omega2(S)(+) as produced by the OpenWrt build system. If none is specified, the script will exit after looking for programmable Omega2 on the network and do nothing.
-- **\<uboot-env-file\>** can be optionally specified to also set a specific uboot environment while flashing the Omega2. The custom firmware must includes the fw_setenv utility and have a writable uboot environment partition for this to work. As factory state Omega2 don't have a writable uboot environment, this is done via a temporary startup script overlayed to the custom firmware and running when the custom firmware runs the first time.
-The *\<uboot-env-file\>* must contain lines starting with a uboot environment name, followed by some whitespace, followed by the value to assign.
+- **\<uboot-env-file\>** can be optionally specified to also set a specific uboot environment while flashing the Omega2. The custom firmware must include the fw_setenv utility and have a writable uboot environment partition for this to work. As factory state Omega2 don't have a writable uboot environment, this is done via a temporary startup script overlayed to the custom firmware and running when the custom firmware runs the first time.
+The *\<uboot-env-file\>* must contain lines starting with a uboot environment variable name, followed by some whitespace, followed by the value to assign.
 
 ## Contributions
 

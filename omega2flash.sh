@@ -150,7 +150,7 @@ fi
 
 # try to access the omega
 echo "[$(date)] Trying to ping6 omega2 at ${OMEGA2_IPV6}"
-ping6 -c 1 ${OMEGA2_LINKLOCAL}
+ping6 -c 2 ${OMEGA2_LINKLOCAL}
 if [[ $? != 0 ]]; then
   echo "[$(date)] could not ping Omega2(S) at ${OMEGA2_IPV6} on ethernet interface ${ETH_IF}"
   exit 1
