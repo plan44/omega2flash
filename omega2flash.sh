@@ -2,8 +2,8 @@
 
 # host script to flash a fresh-from-factory Omega2(+) or Omega2S(+) without user intervention
 
-if [[ $# -lt 2 || $# -gt 4 ]]; then
-  echo "Usage: $0 <ethernet-if> <auto|wait|omega2_ipv6|list|ping> [<firmware.bin> [<uboot_env_file>]]"
+if [[ $# -lt 2 || $# -gt 5 ]]; then
+  echo "Usage: $0 <ethernet-if> <auto|wait|omega2_ipv6|list|ping> [<firmware.bin> [<uboot_env_file>] [<extra_conf_files_dir]]"
   echo "Notes: to find ethernet-if name,"
   echo "- on mac OS, yuse 'networksetup -listallhardwareports'"
   echo "- on Linux, use 'ifconfig' or 'ip link'"
@@ -17,7 +17,14 @@ PROG_LOG="/tmp/flashed_omega2_ipv6"
 ETH_IF=$1
 OMEGA2_IPV6=$2
 FWIMG_FILE=$3
-UBOOT_ENV_FILE=$4
+# if 4th param is dir, it is extra_conf_files_dir, otherwise uboot_env_file
+if [ -d "$4" ]; then
+  EXTRA_CONF_FILES_DIR=$4
+else
+  UBOOT_ENV_FILE=$4
+  EXTRA_CONF_FILES_DIR=$5
+fi
+
 # check for FW image
 if [[ -n "${FWIMG_FILE}" && ! -f "${FWIMG_FILE}" ]]; then
   echo "firmware file '${FWIMG_FILE}' not found"
@@ -28,13 +35,17 @@ if [[ -n "${UBOOT_ENV_FILE}" && ! -f "${UBOOT_ENV_FILE}" ]]; then
   echo "uboot environment file '${UBOOT_ENV_FILE}' not found"
   exit 1
 fi
+# check for extra conf files dir
+if [[ -n "${EXTRA_CONF_FILES_DIR}" && ! -d "${EXTRA_CONF_FILES_DIR}" ]]; then
+  echo "extra configuration files dir '${EXTRA_CONF_FILES_DIR}' not found"
+  exit 1
+fi
+
 # check for "expect" utility
 if ! command -v expect >/dev/null; then
   echo "missing 'expect' command line tool - must be installed for this script to work"
   exit 1
 fi
-
-
 
 # Locate target Omega
 
@@ -148,6 +159,7 @@ if [[ $? == 0 ]]; then
   exit 1
 fi
 
+
 # try to access the omega
 echo "[$(date)] Trying to ping6 omega2 at ${OMEGA2_IPV6}"
 ping6 -c 2 ${OMEGA2_LINKLOCAL}
@@ -178,8 +190,16 @@ fi
 
 
 # create environment setup
+rm /tmp/o2ubootenv
 if [[ -n "${UBOOT_ENV_FILE}" ]]; then
   cp "${UBOOT_ENV_FILE}" /tmp/o2ubootenv
+fi
+
+# possibly add files to config
+rm -r /tmp/extracfg
+if [[ -n "${EXTRA_CONF_FILES_DIR}" ]]; then
+  mkdir /tmp/extracfg
+  cp -r ${EXTRA_CONF_FILES_DIR}/* /tmp/extracfg
 fi
 
 
@@ -193,7 +213,7 @@ fi
 echo ">>>>> provisioning MAC address (if needed)"
 /tmp/provisionmac
 if [ -f /tmp/o2ubootenv ]; then
-  echo ">>>>> setting environment"
+  echo ">>>>> install uboot environment setter"
   # environment is not writable now, we need to defer programming it to when our own FW is up
   # - prepare config backup
   mkdir -p /tmp/cfgbackup/etc/init.d
@@ -202,7 +222,15 @@ if [ -f /tmp/o2ubootenv ]; then
   cp /tmp/setubootenv /tmp/cfgbackup/etc/init.d
   cd /tmp/cfgbackup/etc/rc.d
   ln -s ../init.d/setubootenv S98setubootenv
+fi
+if [ -d /tmp/extracfg ]; then
+  echo ">>>>> copying extra config"
+  mkdir -p /tmp/cfgbackup
+  cp -r /tmp/extracfg/* /tmp/cfgbackup
+fi
+if [ -d /tmp/cfgbackup ]; then
   # create config archive for sysupgrade
+  echo ">>>>> creating extra config archive for sysupgrade"
   cd /tmp/cfgbackup
   tar -czf /tmp/deferredcfg.tgz *
 fi
@@ -234,6 +262,10 @@ echo "[$(date)] Copying firmware, uboot environment and bootstrap script to devi
 # copy uboot env file if there is any
 if [[ -f /tmp/o2ubootenv ]]; then
   /tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  /tmp/o2ubootenv root@[${OMEGA2_LINKLOCAL}]:/tmp
+fi
+# copy extra config files if there are any
+if [[ -d /tmp/extracfg ]]; then
+  /tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r /tmp/extracfg root@[${OMEGA2_LINKLOCAL}]:/tmp
 fi
 # copy deferred uboot env provisioning script (not always used, but needed for factory-broken Omega2S)
 /tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  /tmp/setubootenv root@[${OMEGA2_LINKLOCAL}]:/tmp

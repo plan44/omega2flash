@@ -16,8 +16,8 @@ The script can also program Omega2 found on wireless network segments, however i
 
 ## Usage
 
-    omega2flash <ethernet-if> <auto|wait|omega2_ipv6|list|ping> [<firmware.bin> [<uboot-env-file>]]"
-    
+    omega2flash <ethernet-if> <auto|wait|omega2_ipv6|list|ping> [<firmware.bin> [<uboot-env-file>] [<extra-conf-files-dir]]"
+
 Where:
 
 - **ethernet-if** is the name of the ethernet interface that directly connects to the network segment where the Omega2 devices are connected. On Linux systems, this is usually "eth0" (use `ifconfig` or `ip link` for a list), on macos it's something like "en2" (use `networksetup -listallhardwareports` for a list)
@@ -29,6 +29,7 @@ Where:
 - **\<firmware.bin\>** must be a OpenWrt firmware image for Omega2(S)(+) as produced by the OpenWrt build system. If none is specified, the script will exit after looking for programmable Omega2 on the network and do nothing.
 - **\<uboot-env-file\>** can be optionally specified to also set a specific uboot environment while flashing the Omega2. The custom firmware must include the fw_setenv utility and have a writable uboot environment partition for this to work. As factory state Omega2 don't have a writable uboot environment, this is done via a temporary startup script overlayed to the custom firmware and running when the custom firmware runs the first time.
 The *\<uboot-env-file\>* must contain lines starting with a uboot environment variable name, followed by some whitespace, followed by the value to assign.
+- **\<extra-conf-files-dir\>** can be optionally specified to add extra configuration files. The contents of this directory reflects the root file system of the device. Ususally, it will contain some `etc/uci-defaults/...` and/or `etc/config/...` files.
 
 ## Contributions
 
@@ -40,4 +41,4 @@ The omega2flash script is MIT licensed.
 
 ## Copyright
 
-(c) 2017-2019 by [plan44.ch/luz](https://plan44.ch)
+(c) 2017-2021 by [plan44.ch/luz](https://plan44.ch)
