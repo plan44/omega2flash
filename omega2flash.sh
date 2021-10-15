@@ -4,14 +4,16 @@
 
 if [[ $# -lt 2 || $# -gt 5 ]]; then
   echo "Usage: $0 <ethernet-if> <auto|wait|omega2_ipv6|list|ping> [<firmware.bin> [<uboot_env_file>] [<extra_conf_files_dir]]"
-  echo "Notes: to find ethernet-if name,"
-  echo "- on mac OS, yuse 'networksetup -listallhardwareports'"
-  echo "- on Linux, use 'ifconfig' or 'ip link'"
+  echo "Notes: to find ethernet-if name:"
+  echo "  networksetup -listallhardwareports # for macOS"
+  echo "  ifconfig # Linux traditional tool"
+  echo "  ip link # Linux, modern tool"
   exit 1
 fi
 
 # config
 PROG_LOG="/tmp/flashed_omega2_ipv6"
+touch "${PROG_LOG}"
 
 # gather args
 ETH_IF=$1
@@ -54,6 +56,7 @@ OMEGA_BROKEN_ETH_IPV6="fe80::24c:2ff:fe08:4d0f" # Omega2S with unprogrammed Ethe
 
 OMEGA_MATCH="s/^[0-9]+ +bytes from (${OMEGA_ETH_IPV6_PREFIX}[0-9A-Fa-f]:[0-9A-Fa-f]{4}|${OMEGA_BROKEN_ETH_IPV6}).*\$/\1/p"
 
+
 MISSING_MAC=0
 if [[ "${OMEGA2_IPV6}" == "list" ]]; then
   echo "[$(date)] Searching for Omega2(S)(+) on ${ETH_IF} via ping6 multicast (4 seconds)..."
@@ -78,27 +81,31 @@ elif [[ "${OMEGA2_IPV6}" == "auto" ]]; then
   fi
   echo "[$(date)] Found unprogrammed Omega2 at ${OMEGA2_IPV6} on ${ETH_IF}"
 elif [[ "${OMEGA2_IPV6}" == "wait" ]]; then
-  echo "[$(date)] Polling for unprogrammed Omega2 or Omega2S via ping6 multicast..."
+  echo "[$(date)] Polling for unprogrammed Omega2 or Omega2S devices via ping6 multicast..."
   OMEGA2_IPV6=""
   while [ -z "$OMEGA2_IPV6" ]; do
     # use ping6 multicast to query devices
-    sleep 2
-    echo "- ping..."
-    OMEGA2_IPV6=$(ping6 -c 2 -i 2 ff02::1%${ETH_IF} | sed -n -E -e "${OMEGA_MATCH}")
-    if [ ${#OMEGA2_IPV6} -gt 30 ]; then
-      echo "[$(date)] More than one Omega2 or malprogrammed Omega2S found on Ethernet interface ${ETH_IF}, waiting until only one found"
-      OMEGA2_IPV6=""
-    fi
-    # check for same IPv6 than just programmed one
-    if [ "${OMEGA2_IPV6}" != "${OMEGA_BROKEN_ETH_IPV6}" ]; then
-      if [ -n "${OMEGA2_IPV6}" ]; then
-        grep -q "${OMEGA2_IPV6}" "${PROG_LOG}"
-        if [[ $? == 0 ]]; then
-          # still same, no verbose output
-          echo "  [$(date)] still same device ${OMEGA2_IPV6} -> wait"
-          OMEGA2_IPV6=""
-        fi
+    echo -n "- ping ..."
+    MULTI_OMEGA2_IPV6=$(ping6 -c 2 -i 2 ff02::1%${ETH_IF} | sed -n -E -e "${OMEGA_MATCH}")
+    for NEXT_OMEGA in ${MULTI_OMEGA2_IPV6}; do
+      if [ -z ${NEXT_OMEGA} ]; then continue; fi
+      # one found
+      if [ "${NEXT_OMEGA}" == "${OMEGA_BROKEN_ETH_IPV6}" ]; then
+        # found one with broken IP, program it
+        OMEGA2_IPV6="${NEXT_OMEGA}"
+        break
+      elif ! grep -q "${NEXT_OMEGA}" "${PROG_LOG}"; then
+        # not yet started programming this one
+        OMEGA2_IPV6="${NEXT_OMEGA}"
+        break
       fi
+      # skip already programmed ones
+    done
+    if [ -z "${OMEGA2_IPV6}" ]; then
+      echo " no unprogrammed Omega2 found -> wait"
+      sleep 2
+    else
+      echo ""
     fi
   done
   echo ""
@@ -151,8 +158,7 @@ chmod a+x /tmp/setubootenv
 OMEGA2_LINKLOCAL="${OMEGA2_IPV6}%${ETH_IF}"
 
 # check if this unit was already programmed
-grep "${OMEGA2_IPV6}" "${PROG_LOG}"
-if [[ $? == 0 ]]; then
+if grep "${OMEGA2_IPV6}" "${PROG_LOG}"; then
   # already programmed
   echo "[$(date)] Omega2 at ${OMEGA2_IPV6} has been programmed before -> do not try it again"
   sleep 2
@@ -162,11 +168,13 @@ fi
 
 # try to access the omega
 echo "[$(date)] Trying to ping6 omega2 at ${OMEGA2_IPV6}"
-ping6 -c 2 ${OMEGA2_LINKLOCAL}
-if [[ $? != 0 ]]; then
+if ! ping6 -c 2 ${OMEGA2_LINKLOCAL}; then
   echo "[$(date)] could not ping Omega2(S) at ${OMEGA2_IPV6} on ethernet interface ${ETH_IF}"
   exit 1
 fi
+
+
+
 
 # create temp script to use ssh and scp w/o entering password
 cat >/tmp/o2defpw <<'ENDOFFILE1'
@@ -277,5 +285,5 @@ echo "Executing the flashing script"
 # execute the script
 /tmp/o2defpw ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  root@${OMEGA2_LINKLOCAL} /tmp/o2bootstrap
 
-echo "[$(date)] DONE SO FAR! Make sure not to disconnect Omega2 from power until flashing is complete!"
+echo "[$(date)] ${OMEGA2_LINKLOCAL} DONE SO FAR! Make sure not to disconnect Omega2 from power until flashing is complete!"
 exit 0
