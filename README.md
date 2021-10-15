@@ -22,7 +22,7 @@ Where:
 
 - **ethernet-if** is the name of the ethernet interface that directly connects to the network segment where the Omega2 devices are connected. On Linux systems, this is usually "eth0" (use `ifconfig` or `ip link` for a list), on macos it's something like "en2" (use `networksetup -listallhardwareports` for a list)
 - **auto** as second parameter will automatically look for and flash a single Omega2. It will exit when more than one or no Omega2 is found.
-- **wait** same as *auto*, but script will wait and poll the ethernet interface until a Omega2 is found.
+- **wait** similar to *auto*, but script will wait and poll the ethernet interface until at least one unprogrammed Omega2 is found. There can be multiple unprogrammed Omega2s already connected, the "wait" mode just processes the first unprogrammed one it finds. Note that a temp file (`/tmp/flashed_omega2_ipv6`) is used to record all IPv6 addresses of already programmed devices. In wait mode, the *omega2flash* script can be used in a loop to program batches of devices.
 - **IPv6 address** can be specified to flash a specific Omega2 via its IPv6 link local address
 - **list** will list the link local IPv6 addresses of all Omega2 devices found on the network segment as specified with *ethernet-if*.
 - **ping** will list the link local IPv6 addresses of all devices found on the network segment as specified with *ethernet-if*.
