@@ -1,6 +1,15 @@
-#!/bin/bash
+#!/bin/sh
 
 # host script to flash a fresh-from-factory Omega2(+) or Omega2S(+) without user intervention
+
+# check sufficient shell (we use some bashisms below, but have /bin/sh shebang so we can run on openwrt
+# (having no $SHELL set is assumed to mean being called from an environment such as startup scripts which knows this shell is ok)
+if [ -n "$SHELL" ]; then
+if ! echo "$SHELL" | grep -q -E -e "zsh|bash|ash"; then
+  echo "Error: needs zsh, bash or ash shell."
+  exit 1
+fi
+fi
 
 if [[ $# -lt 2 || $# -gt 5 ]]; then
   echo "Usage: $0 <ethernet-if> <auto|wait|omega2_ipv6|list|ping> [<firmware.bin> [<uboot_env_file>] [<extra_conf_files_dir]]"
@@ -43,10 +52,19 @@ if [[ -n "${EXTRA_CONF_FILES_DIR}" && ! -d "${EXTRA_CONF_FILES_DIR}" ]]; then
   exit 1
 fi
 
+# ssh/scp with automatic password
+SSHCOMMAND="/tmp/o2defpw ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+SCPCOMMAND="/tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 # check for "expect" utility
 if ! command -v expect >/dev/null; then
-  echo "missing 'expect' command line tool - must be installed for this script to work"
-  exit 1
+  # OpebWrt only, no expect command, try more specific p44-openwrt-only sshpass
+  SSHCOMMAND="sshpass -p onioneer ssh -y -y"
+  SCPCOMMAND="sshpass -p onioneer scp -y -y"
+  if ! command -v sshpass >/dev/null; then
+    echo "missing 'expect' or 'sshpass' command line tool - one of these must be installed for this script to work"
+    exit 1
+  fi
+  echo "sshpass utility available: assuming OpenWrt and scp with -y-y option"
 fi
 
 # Locate target Omega
@@ -85,6 +103,7 @@ elif [[ "${OMEGA2_IPV6}" == "wait" ]]; then
   OMEGA2_IPV6=""
   while [ -z "$OMEGA2_IPV6" ]; do
     # use ping6 multicast to query devices
+    OMEGA2_CONNECTED=0
     echo -n "- ping ..."
     MULTI_OMEGA2_IPV6=$(ping6 -c 2 -i 2 ff02::1%${ETH_IF} | sed -n -E -e "${OMEGA_MATCH}")
     for NEXT_OMEGA in ${MULTI_OMEGA2_IPV6}; do
@@ -100,9 +119,11 @@ elif [[ "${OMEGA2_IPV6}" == "wait" ]]; then
         break
       fi
       # skip already programmed ones
+      # - count them
+      OMEGA2_CONNECTED=$((${OMEGA2_CONNECTED}+1))
     done
     if [ -z "${OMEGA2_IPV6}" ]; then
-      echo " no unprogrammed Omega2 found -> wait"
+      echo " no unprogrammed Omega2 found (${OMEGA2_CONNECTED} connected) -> wait"
       sleep 2
     else
       echo ""
@@ -190,13 +211,6 @@ ENDOFFILE1
 chmod a+x /tmp/o2defpw
 
 
-# Now we are reasonably sure we will be able to program this unit, remember it for not programming twice
-# but do not remember the non-unique missing MAC derived IPv6, as we might need to program more of these
-if [[ ${MISSING_MAC} == 0 ]]; then
-  echo "${OMEGA2_IPV6}" >>"${PROG_LOG}"
-fi
-
-
 # create environment setup
 rm /tmp/o2ubootenv
 if [[ -n "${UBOOT_ENV_FILE}" ]]; then
@@ -260,30 +274,81 @@ chmod a+x /tmp/o2bootstrap
 
 
 echo "[$(date)] Trying to login to Omega2 and do a ls -la /tmp ..."
-/tmp/o2defpw ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -y -y root@${OMEGA2_LINKLOCAL} "ls -la /tmp"
+COUNT=0
+while ! ${SSHCOMMAND} root@${OMEGA2_LINKLOCAL} "ls -la /tmp"; do
+  echo "[$(date)] - not yet ready (${COUNT}), trying again in 5 seconds..."
+  COUNT=$((${COUNT}+1))
+  sleep 5
+  if [[ ${COUNT} == 12 ]]; then
+    echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error: repeatedly failed logging into Omega2"
+    exit 1
+  fi
+done
 
 echo "[$(date)] Copying firmware, uboot environment and bootstrap script to device ..."
 # copy fw image
-/tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no "${FWIMG_FILE}" root@[${OMEGA2_LINKLOCAL}]:/tmp/o2firmware.bin
+if ! ${SCPCOMMAND} "${FWIMG_FILE}" root@[${OMEGA2_LINKLOCAL}]:/tmp/o2firmware.bin; then
+  echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error copying firmware"
+  exit 1
+fi
+echo "[$(date)] - firmware copied ..."
 # copy MAC provisioning script
-/tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  /tmp/provisionmac root@[${OMEGA2_LINKLOCAL}]:/tmp
+if ! ${SCPCOMMAND} /tmp/provisionmac root@[${OMEGA2_LINKLOCAL}]:/tmp; then
+  echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error copying MAC provisioning script"
+  exit 1
+fi
+echo "[$(date)] - MAC provisioning script copied ..."
 # copy uboot env file if there is any
 if [[ -f /tmp/o2ubootenv ]]; then
-  /tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  /tmp/o2ubootenv root@[${OMEGA2_LINKLOCAL}]:/tmp
+  if ! ${SCPCOMMAND} /tmp/o2ubootenv root@[${OMEGA2_LINKLOCAL}]:/tmp; then
+    echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error copying uboot environment data"
+    exit 1
+  fi
+  echo "[$(date)] - custom uboot environment data copied..."
 fi
 # copy extra config files if there are any
 if [[ -d /tmp/extracfg ]]; then
-  /tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r /tmp/extracfg root@[${OMEGA2_LINKLOCAL}]:/tmp
+  if ! ${SCPCOMMAND} -r /tmp/extracfg root@[${OMEGA2_LINKLOCAL}]:/tmp; then
+    echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error copying extra config files dir"
+    exit 1
+  fi
+  echo "[$(date)] - extra config files dir copied..."
 fi
 # copy deferred uboot env provisioning script (not always used, but needed for factory-broken Omega2S)
-/tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  /tmp/setubootenv root@[${OMEGA2_LINKLOCAL}]:/tmp
+if ! ${SCPCOMMAND} /tmp/setubootenv root@[${OMEGA2_LINKLOCAL}]:/tmp; then
+  echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error copying uboot environment provisioning script"
+  exit 1
+fi
+echo "[$(date)] - uboot environment provisioning script copied ..."
 # copy bootstrap script
-/tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  /tmp/o2bootstrap root@[${OMEGA2_LINKLOCAL}]:/tmp
+if ! ${SCPCOMMAND} /tmp/o2bootstrap root@[${OMEGA2_LINKLOCAL}]:/tmp; then
+  echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error copying updater script"
+  exit 1
+fi
+echo "[$(date)] - updater script copied ..."
 echo "done copying files"
 
-echo "Executing the flashing script"
-# execute the script
-/tmp/o2defpw ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no  root@${OMEGA2_LINKLOCAL} /tmp/o2bootstrap
+# Now we are reasonably sure we will be able to program this unit, remember it for not programming twice
+# but do not remember the non-unique missing MAC derived IPv6, as we might need to program more of these
+if [[ ${MISSING_MAC} == 0 ]]; then
+  echo "${OMEGA2_IPV6}" >>"${PROG_LOG}"
+fi
+
+# actually execute the updater script
+echo "[$(date)] - Executing the updater script"
+if ! ${SSHCOMMAND} root@${OMEGA2_LINKLOCAL} /tmp/o2bootstrap; then
+  echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>> error executing the updater script"
+  exit 1
+fi
+
+# let me see these executing on the target
+sleep 5
+
+if [[ ${MISSING_MAC} != 0 ]]; then
+  echo "[$(date)] ### the device initially had a broken MAC and was re-provisioned -> duplicate checking is not possible, wait >=3min before restarting"
+  # special exit code to inform caller to wait >=3min before calling again
+  exit 2
+fi
 
 echo "[$(date)] ${OMEGA2_LINKLOCAL} DONE SO FAR! Make sure not to disconnect Omega2 from power until flashing is complete!"
 exit 0
