@@ -57,11 +57,12 @@ SSHCOMMAND="/tmp/o2defpw ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChe
 SCPCOMMAND="/tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 # check for "expect" utility
 if ! command -v expect >/dev/null; then
-  # OpebWrt only, no expect command, try more specific p44-openwrt-only sshpass
+  # OpenWrt only, no expect command, try more specific p44-openwrt-only sshpass
   SSHCOMMAND="sshpass -p onioneer ssh -y -y"
   SCPCOMMAND="sshpass -p onioneer scp -y -y"
   if ! command -v sshpass >/dev/null; then
     echo "missing 'expect' or 'sshpass' command line tool - one of these must be installed for this script to work"
+    echo "Note: for desktop systems, 'expect' is recommended. 'sshpass' is only tested on OpenWrt"
     exit 1
   fi
   echo "sshpass utility available: assuming OpenWrt and scp with -y-y option"
