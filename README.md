@@ -31,6 +31,8 @@ Where:
 The *\<uboot-env-file\>* must contain lines starting with a uboot environment variable name, followed by some whitespace, followed by the value to assign.
 - **\<extra-conf-files-dir\>** can be optionally specified to add extra configuration files. The contents of this directory reflects the root file system of the device. Ususally, it will contain some `etc/uci-defaults/...` and/or `etc/config/...` files.
 
+Note: The script generates ANSI colored output when run from a terminal. Set `NO_COLOR` environment variable to prevent colors, or set `FORCE_COLOR` to output color even if stdout is not a terminal (e.g. to create logfiles with color included).
+
 ## Contributions
 
 ...are welcome! There's a lot that could be improved. Pull requests and comments can be posted on [github](https://github.com/plan44/omega2flash.git)
@@ -41,4 +43,4 @@ The omega2flash script is MIT licensed.
 
 ## Copyright
 
-(c) 2017-2021 by [plan44.ch/luz](https://plan44.ch)
+(c) 2017-2022 by [plan44.ch/luz](https://plan44.ch)
