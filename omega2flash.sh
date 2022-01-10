@@ -111,7 +111,7 @@ fi
 OMEGA_ETH_IPV6_PREFIX="fe80::42a3:6bff:fec" # Omega2 prefix
 OMEGA_BROKEN_ETH_IPV6="fe80::24c:2ff:fe08:4d0f" # Omega2S with unprogrammed Ethernet MAC
 
-OMEGA_MATCH="s/^[0-9]+ +bytes from (${OMEGA_ETH_IPV6_PREFIX}[0-9A-Fa-f]:[0-9A-Fa-f]{4}|${OMEGA_BROKEN_ETH_IPV6}).*\$/\1/p"
+OMEGA_MATCH="s/^[0-9]+ +bytes from (${OMEGA_ETH_IPV6_PREFIX}[0-9A-Fa-f]:[0-9A-Fa-f]{1,4}|${OMEGA_BROKEN_ETH_IPV6}).*\$/\1/p"
 
 
 MISSING_MAC=0
