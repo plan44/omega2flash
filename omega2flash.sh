@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# use bash when available
+if [ -e /bin/bash -a -z "${_BASH_REDIRECTED}" ]; then
+  _BASH_REDIRECTED=1 exec /bin/bash $0 $@
+  exit 1
+fi
+
 # host script to flash a fresh-from-factory Omega2(+) or Omega2S(+) without user intervention
 
 # colored output
