@@ -105,8 +105,8 @@ if ! command -v expect >/dev/null; then
   SSHCOMMAND="sshpass -p onioneer ssh -y -y"
   SCPCOMMAND="sshpass -p onioneer scp -y -y"
   if ! command -v sshpass >/dev/null; then
-    echo "missing 'expect' or 'sshpass' command line tool - one of these must be installed for this script to work"
-    echo "Note: for desktop systems, 'expect' is recommended. 'sshpass' is only tested on OpenWrt"
+    err "missing 'expect' or 'sshpass' command line tool - one of these must be installed for this script to work"
+    info "Note: for desktop systems, 'expect' is recommended. 'sshpass' is only tested on OpenWrt"
     exit 1
   fi
   echo "sshpass utility available: assuming OpenWrt and scp with -y-y option"
@@ -202,7 +202,7 @@ iwpriv ra0 e2p 28=A340 | iwpriv ra0 e2p 2A=C16B | iwpriv ra0 e2p 2C=${IDWORD}
 ENDOFFILE4
 else
   info "[$(date)] Found Omega2(S) with valid ethernet MAC at ${OMEGA2_IPV6} on ${ETH_IF}"
-  info "# MAC is ok -> NOP" >/tmp/provisionmac
+  echo "# MAC is ok -> NOP" >/tmp/provisionmac
 fi
 chmod a+x /tmp/provisionmac
 
