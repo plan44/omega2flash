@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# ssh options (needed to connect to old/unknown units with old crypto and maybe re-used IP/host address)
+SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa"
+
 # use bash when available
 if [ -e /bin/bash -a -z "${_BASH_REDIRECTED}" ]; then
   _BASH_REDIRECTED=1 exec /bin/bash $0 $@
@@ -97,8 +100,8 @@ if [[ -n "${EXTRA_CONF_FILES_DIR}" && ! -d "${EXTRA_CONF_FILES_DIR}" ]]; then
 fi
 
 # ssh/scp with automatic password
-SSHCOMMAND="/tmp/o2defpw ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-SCPCOMMAND="/tmp/o2defpw scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+SSHCOMMAND="/tmp/o2defpw ssh ${SSH_OPTS}"
+SCPCOMMAND="/tmp/o2defpw scp ${SSH_OPTS}"
 # check for "expect" utility
 if ! command -v expect >/dev/null; then
   # OpenWrt only, no expect command, try more specific p44-openwrt-only sshpass
@@ -387,6 +390,6 @@ if [[ ${MISSING_MAC} != 0 ]]; then
 fi
 
 notice "[$(date)] ${OMEGA2_LINKLOCAL} DONE SO FAR!"
-info "Make sure not to disconnect Omega2 from power until flashing is complete!"
+warn "Make sure not to disconnect Omega2 from power until flashing is complete!"
 notice "===========================================\n\n\n"
 exit 0
