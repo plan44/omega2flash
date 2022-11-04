@@ -235,13 +235,14 @@ if grep "${OMEGA2_IPV6}" "${PROG_LOG}"; then
   exit 1
 fi
 
-notice "\n\n[$(date)] ##### Start programming ${OMEGA2_LINKLOCAL}"
-
 # try to access the omega
 echo "[$(date)] Trying to ping6 omega2 at ${OMEGA2_IPV6}"
 if ! ping6 -c 2 ${OMEGA2_LINKLOCAL}; then
   die "[$(date)] could not (yet) ping Omega2(S) at ${OMEGA2_IPV6} on ethernet interface ${ETH_IF}"
 fi
+
+
+notice "\n\n\n\n[$(date)] ##### Start programming ${OMEGA2_LINKLOCAL}"
 
 # create temp script to use ssh and scp w/o entering password
 cat >/tmp/o2defpw <<'ENDOFFILE1'
@@ -391,5 +392,5 @@ fi
 
 notice "[$(date)] ${OMEGA2_LINKLOCAL} DONE SO FAR!"
 warn "Make sure not to disconnect Omega2 from power until flashing is complete!"
-notice "===========================================\n\n\n"
+notice "===========================================\n"
 exit 0
